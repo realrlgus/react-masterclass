@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "react-query";
 import { Link, useMatch } from "react-router-dom";
 import { Route, Routes, useLocation, useParams } from "react-router-dom";
 import styled from "styled-components";
+import { fetchCoin, fetchCoinTickers } from "../api";
 import Chart from "./Chart";
 import Price from "./Price";
 
@@ -87,6 +89,10 @@ interface RouteState {
   };
 }
 
+interface RouteParams {
+  coinId: string;
+}
+
 interface InfoData {
   id: string;
   name: string;
@@ -146,34 +152,25 @@ interface PriceData {
 }
 
 const Coin = () => {
-  const [loading, setLoading] = useState(true);
-  const { coinId } = useParams();
+  const { coinId } = useParams() as unknown as RouteParams;
   const { state } = useLocation() as RouteState;
-  const [info, setInfo] = useState<InfoData>();
-  const [priceInfo, setPriceInfo] = useState<PriceData>();
   const priceMatch = useMatch("/:price_id/price");
   const chartMatch = useMatch("/:price_id/chart");
+  const { isLoading: infoLoading, data: infoData } = useQuery<InfoData>(
+    ["info", coinId],
+    () => fetchCoin(coinId)
+  );
+  const { isLoading: tickersLoading, data: tickersData } = useQuery<PriceData>(
+    ["ticker", coinId],
+    () => fetchCoinTickers(coinId)
+  );
 
-  useEffect(() => {
-    (async () => {
-      const infoData = await (
-        await fetch(`https://api.coinpaprika.com/v1/coins/${coinId}`)
-      ).json();
-      const priceData = await (
-        await fetch(`https://api.coinpaprika.com/v1/tickers/${coinId}`)
-      ).json();
-
-      setInfo(infoData);
-      setPriceInfo(priceData);
-      setLoading(false);
-    })();
-  }, [coinId]);
-
+  const loading = infoLoading || tickersLoading;
   return (
     <Container>
       <Header>
         <Title>
-          {state?.name ? state.name : loading ? "Loading..." : info?.name}
+          {state?.name ? state.name : loading ? "Loading..." : infoData?.name}
         </Title>
       </Header>
       {loading ? (
@@ -183,28 +180,30 @@ const Coin = () => {
           <OverView>
             <OverViewItem>
               <OverViewTitle>랭킹</OverViewTitle>
-              <OverViewValue>{info?.rank}위</OverViewValue>
+              <OverViewValue>{infoData?.rank}위</OverViewValue>
             </OverViewItem>
             <OverViewItem>
               <OverViewTitle>심볼</OverViewTitle>
-              <OverViewValue>{info?.symbol}</OverViewValue>
+              <OverViewValue>{infoData?.symbol}</OverViewValue>
             </OverViewItem>
             <OverViewItem>
               <OverViewTitle>오픈소스</OverViewTitle>
-              <OverViewValue>{info?.open_source ? "Yes" : "No"}</OverViewValue>
+              <OverViewValue>
+                {infoData?.open_source ? "Yes" : "No"}
+              </OverViewValue>
             </OverViewItem>
           </OverView>
-          <Description>{info?.description}</Description>
+          <Description>{infoData?.description}</Description>
           <OverView>
             <OverViewItem>
               <OverViewTitle>총 발행량</OverViewTitle>
-              <OverViewValue>{priceInfo?.total_supply}개</OverViewValue>
+              <OverViewValue>{tickersData?.total_supply}개</OverViewValue>
             </OverViewItem>
             <OverViewItem>
               <OverViewTitle>최대 발행량</OverViewTitle>
               <OverViewValue>
-                {priceInfo?.max_supply
-                  ? `${priceInfo?.max_supply}개`
+                {tickersData?.max_supply
+                  ? `${tickersData?.max_supply}개`
                   : "무제한"}
               </OverViewValue>
             </OverViewItem>
